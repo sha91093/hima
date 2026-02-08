@@ -1,0 +1,6 @@
+# 必須（Excel読み込み時のみ）
+pandas>=1.5
+openpyxl>=3.0
+
+# オプション（よりモダンなGUI。なくても標準tkinterで動作）
+# customtkinter>=5.0
