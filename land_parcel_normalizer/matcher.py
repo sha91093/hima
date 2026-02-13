@@ -117,7 +117,19 @@ class SISMatcher:
                     "confidence": 0.85,
                 }
 
-        # 4. あいまい検索（類似度が高い候補を返す）
+        # 4. 親地番マッチ（枝番を削って上位の地番に一致させる）
+        # 例: "1618-1-イ" → "1618-1" → "1618" の順に試行
+        parent_match = self._try_parent_match(full, oaza, chiban)
+        if parent_match:
+            return {
+                "input": normalized_parcel,
+                "status": MatchStatus.INFERRED,
+                "matched_to": parent_match,
+                "candidates": [],
+                "confidence": 0.80,
+            }
+
+        # 5. あいまい検索（類似度が高い候補を返す）
         candidates = self._find_similar(full, search_pool, max_candidates=5)
 
         if candidates and candidates[0]["score"] >= 0.8:
@@ -140,6 +152,28 @@ class SISMatcher:
     def match_batch(self, normalized_parcels: list[dict]) -> list[dict]:
         """複数の正規化済み地番を一括照合する。"""
         return [self.match_single(p) for p in normalized_parcels]
+
+    def _try_parent_match(self, full: str, oaza: str,
+                          chiban: str) -> str | None:
+        """
+        枝番を1段ずつ削って親地番に一致するか試す。
+        例: chiban="1618-1-イ" → "1618-1" → "1618" の順に試行。
+        """
+        segments = chiban.split("-")
+        # 2セグメント以上あれば末尾を削って試行（最低1セグメントは残す）
+        while len(segments) > 1:
+            segments = segments[:-1]
+            parent_chiban = "-".join(segments)
+            parent_full = f"{oaza}{parent_chiban}" if oaza else parent_chiban
+
+            if parent_full in self.master_parcels:
+                return parent_full
+
+            parent_key = self._make_key(parent_full)
+            if parent_key in self._normalized_index:
+                return self._normalized_index[parent_key]
+
+        return None
 
     def _find_similar(self, query: str, pool: list[str],
                       max_candidates: int = 5) -> list[dict]:

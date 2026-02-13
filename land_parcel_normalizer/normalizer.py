@@ -214,6 +214,17 @@ def _is_simple_value(text: str) -> bool:
     return False
 
 
+def _looks_like_chiban(text: str) -> bool:
+    """分割後の要素が地番らしいかどうか判定する。人名等を除外するため。"""
+    # 数字で始まる（例: "1618-1", "123", "1618-1-イ"）
+    if re.match(r"\d", text):
+        return True
+    # 枝番補完で使える単純な値（カナ1文字等）
+    if _is_simple_value(text):
+        return True
+    return False
+
+
 def extract_oaza(text: str, oaza_list: list[str]) -> tuple[str, str]:
     """
     大字名を前方一致で分離する。
@@ -276,26 +287,35 @@ def normalize_single(raw: str, oaza_list: list[str] | None = None,
     if oaza_list:
         oaza, parcel_text = extract_oaza(text, oaza_list)
 
-    # ステップ3.5: 地番部分のみ漢数字→算用数字に変換
+    # ステップ3.5: 小字名（字○○）を除去
+    # 例: "字吉富 1618-1" → "1618-1"
+    parcel_text = re.sub(r"字[^\d\s\-,、・/ア-ンa-zA-Z]+", "", parcel_text)
+    parcel_text = parcel_text.strip()
+
+    # ステップ3.6: 地番部分のみ漢数字→算用数字に変換
     parcel_text = _replace_kanji_numbers_in_text(parcel_text)
 
     if not parcel_text:
         return []
 
-    # ステップ3.6: 数字の直後にカタカナが続く場合、ハイフンを挿入
+    # ステップ3.7: 数字の直後にカタカナが続く場合、ハイフンを挿入
     # 例: "200-1ア" → "200-1-ア"（分筆カナ表記の補完）
     parcel_text = re.sub(r"(\d)([ア-ン])", r"\1-\2", parcel_text)
 
-    # ステップ3.7: 「数字の数字」→「数字-数字」（古い地番表記の変換）
+    # ステップ3.8: 「数字の数字」→「数字-数字」（古い地番表記の変換）
     parcel_text = re.sub(r"(\d)の(\d)", r"\1-\2", parcel_text)
 
-    # ステップ3.8: 地番として不要な日本語テキスト（説明文）を除去
+    # ステップ3.9: 地番として不要な日本語テキスト（説明文）を除去
     # "の加藤の田んぼ" のような非地番テキストを末尾から除去
     parcel_text = re.sub(r"[のにでがをへは][^\d\-,、・/ア-ンa-zA-Z].*$", "",
                          parcel_text)
 
     # ステップ4: セパレーター分割
     parts = split_by_separators(parcel_text)
+
+    # ステップ4.5: 地番らしくない要素（人名等）を除去
+    # 数字・ハイフン・カナ1文字で始まるもののみ残す
+    parts = [p for p in parts if _looks_like_chiban(p)]
 
     # ステップ5: 枝番補完
     expanded = expand_branch_numbers(parts)

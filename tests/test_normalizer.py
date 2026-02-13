@@ -215,5 +215,58 @@ class TestRealWorldPatterns(unittest.TestCase):
         self.assertIn("三本木127-3", fulls)
 
 
+class TestKoazaAndPersonName(unittest.TestCase):
+    """小字名・人名混在パターンのテスト"""
+
+    def test_aza_with_person_name(self):
+        """「内河野字吉富 1618-1-ｲ 日本太郎 借り」"""
+        oaza = ["内河野"]
+        results = normalize_single("内河野字吉富 1618-1-ｲ 日本太郎 借り", oaza)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]["oaza"], "内河野")
+        self.assertEqual(results[0]["chiban"], "1618-1-イ")
+        self.assertEqual(results[0]["full"], "内河野1618-1-イ")
+
+    def test_aza_removal(self):
+        """小字名だけ除去して地番は残す"""
+        oaza = ["内河野"]
+        results = normalize_single("内河野字吉富 100-1", oaza)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]["full"], "内河野100-1")
+
+    def test_person_name_after_chiban(self):
+        """地番の後に人名がある場合、人名を除去"""
+        oaza = ["三本木"]
+        results = normalize_single("三本木123-1 山田花子", oaza)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]["full"], "三本木123-1")
+
+
+class TestParentParcelMatch(unittest.TestCase):
+    """親地番マッチングのテスト"""
+
+    def test_branch_to_parent(self):
+        """1618-1-イ → マスターに1618-1があれば推測成功"""
+        from land_parcel_normalizer.matcher import SISMatcher, MatchStatus
+        master = {"内河野1618-1"}
+        matcher = SISMatcher(master, ["内河野"])
+        parcel = {"oaza": "内河野", "chiban": "1618-1-イ",
+                  "full": "内河野1618-1-イ", "raw": "test"}
+        result = matcher.match_single(parcel)
+        self.assertEqual(result["status"], MatchStatus.INFERRED)
+        self.assertEqual(result["matched_to"], "内河野1618-1")
+
+    def test_exact_still_works(self):
+        """枝番付きがマスターにあればそちらに完全一致"""
+        from land_parcel_normalizer.matcher import SISMatcher, MatchStatus
+        master = {"内河野1618-1-イ", "内河野1618-1"}
+        matcher = SISMatcher(master, ["内河野"])
+        parcel = {"oaza": "内河野", "chiban": "1618-1-イ",
+                  "full": "内河野1618-1-イ", "raw": "test"}
+        result = matcher.match_single(parcel)
+        self.assertEqual(result["status"], MatchStatus.EXACT)
+        self.assertEqual(result["matched_to"], "内河野1618-1-イ")
+
+
 if __name__ == "__main__":
     unittest.main()
