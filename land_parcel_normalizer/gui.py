@@ -40,7 +40,7 @@ from tkinter import filedialog, messagebox
 
 from .normalizer import normalize_single
 from .converter import (
-    read_excel_column, read_csv_column, read_master_csv,
+    read_excel_column, read_csv_column, read_master,
     convert_and_compare, export_comparison_csv,
 )
 from .matcher import SISMatcher, MatchStatus
@@ -239,8 +239,10 @@ class LandParcelApp:
 
     def _select_master(self):
         path = filedialog.askopenfilename(
-            title="SISマスターCSVを選択",
+            title="SISマスターを選択",
             filetypes=[
+                ("Excel/CSV", "*.xlsx *.xls *.csv"),
+                ("Excel", "*.xlsx *.xls"),
                 ("CSV", "*.csv"),
                 ("すべて", "*.*"),
             ]
@@ -284,7 +286,7 @@ class LandParcelApp:
                 master_oaza_col_str = self.master_oaza_col_var.get().strip()
                 master_oaza_col = self._parse_column(master_oaza_col_str) if master_oaza_col_str else None
 
-                self.master_data = read_master_csv(
+                self.master_data = read_master(
                     master_path,
                     chiban_column=master_chiban_col,
                     oaza_column=master_oaza_col,

@@ -107,11 +107,12 @@ def read_csv_column(filepath: str, chiban_column: str | int = 0,
     )
 
 
-def read_master_csv(filepath: str, chiban_column: str | int = 0,
-                    oaza_column: str | int | None = None,
-                    encoding: str = "cp932") -> dict:
+def read_master(filepath: str, chiban_column: str | int = 0,
+                oaza_column: str | int | None = None,
+                encoding: str = "cp932") -> dict:
     """
-    SISマスター（正解地番CSV）を読み込む。
+    SISマスター（正解地番）を読み込む。Excel/CSV両対応。
+    拡張子で自動判別する。
 
     Returns:
         {
@@ -120,6 +121,64 @@ def read_master_csv(filepath: str, chiban_column: str | int = 0,
             "raw_records": list of 元レコード,
         }
     """
+    ext = Path(filepath).suffix.lower()
+    if ext in (".xlsx", ".xls"):
+        return _read_master_excel(filepath, chiban_column, oaza_column)
+    else:
+        return _read_master_csv(filepath, chiban_column, oaza_column, encoding)
+
+
+def _read_master_excel(filepath: str, chiban_column: str | int = 0,
+                       oaza_column: str | int | None = None) -> dict:
+    """SISマスターをExcelから読み込む。"""
+    if not HAS_PANDAS:
+        raise ImportError(
+            "Excelの読み込みにはpandasが必要です。\n"
+            "pip install pandas openpyxl を実行してください。"
+        )
+
+    df = pd.read_excel(filepath)
+
+    # 地番列の特定
+    if isinstance(chiban_column, int):
+        chiban_col_name = df.columns[chiban_column]
+    else:
+        chiban_col_name = chiban_column
+
+    # 大字列の特定
+    oaza_col_name = None
+    if oaza_column is not None:
+        if isinstance(oaza_column, int):
+            oaza_col_name = df.columns[oaza_column]
+        else:
+            oaza_col_name = oaza_column
+
+    parcels = set()
+    oaza_set = set()
+    raw_records = []
+
+    for _, row in df.iterrows():
+        chiban = str(row[chiban_col_name]).strip() if pd.notna(row[chiban_col_name]) else ""
+        if chiban:
+            parcels.add(chiban)
+            raw_records.append(row.to_dict())
+
+        if oaza_col_name and pd.notna(row.get(oaza_col_name)):
+            oaza = str(row[oaza_col_name]).strip()
+            if oaza:
+                oaza_set.add(oaza)
+
+    return {
+        "parcels": parcels,
+        "oaza_list": sorted(oaza_set),
+        "raw_records": raw_records,
+    }
+
+
+def _read_master_csv(filepath: str, chiban_column: str | int = 0,
+                     oaza_column: str | int | None = None,
+                     encoding: str = "cp932") -> dict:
+    """SISマスターをCSVから読み込む。"""
     parcels = set()
     oaza_set = set()
     raw_records = []
@@ -169,6 +228,10 @@ def read_master_csv(filepath: str, chiban_column: str | int = 0,
         "oaza_list": sorted(oaza_set),
         "raw_records": raw_records,
     }
+
+
+# 後方互換エイリアス
+read_master_csv = read_master
 
 
 def convert_and_compare(input_rows: list[dict],

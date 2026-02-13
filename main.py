@@ -46,7 +46,7 @@ def _run_cli(args):
     """CLIモードで変換を実行。"""
     from land_parcel_normalizer.normalizer import normalize_single
     from land_parcel_normalizer.converter import (
-        read_csv_column, read_master_csv, convert_and_compare,
+        read_csv_column, read_master, convert_and_compare,
         export_comparison_csv,
     )
     from land_parcel_normalizer.matcher import SISMatcher
@@ -103,7 +103,7 @@ def _run_cli(args):
     if args.master:
         master_chiban_col = parse_col(args.master_chiban_col)
         master_oaza_col = parse_col(args.master_oaza_col)
-        master_data = read_master_csv(
+        master_data = read_master(
             args.master,
             chiban_column=master_chiban_col,
             oaza_column=master_oaza_col,
